@@ -1,4 +1,4 @@
-# 🌾 Stardew Valley AI 研究助手 v2.0
+# 🌾 AI 游戏攻略研究助手
 
 > 基于 AutoGen 框架的多代理 AI 研究系统 | 支持多轮对话 | 66% Token 节省
 

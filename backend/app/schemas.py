@@ -12,6 +12,7 @@ from datetime import datetime
 class ResearchRequest(BaseModel):
     """研究启动请求"""
     question: str = Field(..., min_length=1, description="用户问题")
+    game: str = Field("Stardew Valley", description="目标游戏名称")
     model: str = Field("qwen", description="LLM 模型 (qwen/gpt4/claude)")
     debug: bool = Field(False, description="是否启用调试模式")
 
@@ -19,6 +20,7 @@ class ResearchRequest(BaseModel):
         json_schema_extra = {
             "example": {
                 "question": "第一年春季最赚钱的农作物是什么?",
+                "game": "Stardew Valley",
                 "model": "qwen",
                 "debug": False
             }
@@ -28,6 +30,7 @@ class ResearchRequest(BaseModel):
 class ResearchResponse(BaseModel):
     """研究响应"""
     session_id: str = Field(..., description="会话 ID")
+    game: str = Field(..., description="目标游戏")
     question: str = Field(..., description="原始问题")
     question_type: str = Field(..., description="问题类型")
     subtasks_count: int = Field(..., description="子任务数")
@@ -39,6 +42,7 @@ class ResearchResponse(BaseModel):
         json_schema_extra = {
             "example": {
                 "session_id": "550e8400-e29b-41d4-a716-446655440000",
+                "game": "Stardew Valley",
                 "question": "第一年春季最赚钱的农作物是什么?",
                 "question_type": "strategy_qa",
                 "subtasks_count": 3,
@@ -53,6 +57,7 @@ class ResearchTurnRequest(BaseModel):
     """单轮对话请求"""
     session_id: Optional[str] = Field(None, description="会话 ID (为空则创建新会话)")
     question: str = Field(..., min_length=1, description="当前问题")
+    game: Optional[str] = Field(None, description="目标游戏名称（为空则沿用会话）")
     model: str = Field("qwen", description="LLM 模型")
     debug: bool = Field(False, description="是否启用调试")
     use_memory: bool = Field(True, description="是否使用历史上下文")
@@ -62,6 +67,7 @@ class ResearchTurnRequest(BaseModel):
             "example": {
                 "session_id": "550e8400-e29b-41d4-a716-446655440000",
                 "question": "这些农作物的生长周期是多少?",
+                "game": "Stardew Valley",
                 "model": "qwen",
                 "debug": False,
                 "use_memory": True
@@ -73,6 +79,7 @@ class ResearchTurnResponse(BaseModel):
     """单轮对话响应"""
     session_id: str
     turn: int
+    game: str
     question: str
     answer: str
     evidence_count: int
@@ -84,6 +91,7 @@ class ResearchTurnResponse(BaseModel):
             "example": {
                 "session_id": "550e8400-e29b-41d4-a716-446655440000",
                 "turn": 2,
+                "game": "Stardew Valley",
                 "question": "这些农作物的生长周期是多少?",
                 "answer": "Parsnip 和 Cauliflower...",
                 "evidence_count": 8,

@@ -23,6 +23,44 @@ class DeepResearchFlow:
         self.research_history = []
         self.session_id = None
 
+    def _normalize_game_name(self, game: Optional[str]) -> str:
+        if not game or not game.strip():
+            return "Stardew Valley"
+        return game.strip()
+
+    def _get_game_domain_context(self, game: str) -> str:
+        return f"《{game}》游戏攻略与机制"
+
+    def _get_game_domain_hint(self, game: str) -> str:
+        return (
+            f"请仅基于《{game}》游戏语境理解问题，不要扩展到现实世界的同名词汇、学术论文或无关行业内容。"
+        )
+
+    def _normalize_game_question(self, question: str, game: str) -> str:
+        normalized = question.strip()
+        if not normalized:
+            return normalized
+
+        lower = normalized.lower()
+        game_lower = game.lower()
+        has_game_hint = game_lower in lower or game in normalized
+
+        if has_game_hint:
+            return normalized
+
+        return f"【{game}游戏问题】{normalized}"
+
+    def _build_game_search_query(self, query: str, game: str) -> str:
+        base = query.strip()
+        if not base:
+            return game
+
+        lower = base.lower()
+        if game.lower() in lower or game in base:
+            return base
+
+        return f"{game} {base}"
+
     async def _call_llm(self, prompt: str, system_prompt: str = "") -> str:
         """通过LLM调用"""
         try:
@@ -89,13 +127,17 @@ class DeepResearchFlow:
             logger.error(f"❌ QWen调用失败: {str(e)}")
             return f"调用失败: {str(e)}"
 
-    async def route_question(self, question: str) -> Dict[str, Any]:
+    async def route_question(self, question: str, game: str) -> Dict[str, Any]:
         """步骤1: 问题路由和分类"""
         logger.info(f"🚀 [1/5] 路由问题: {question[:50]}...")
 
-        system_prompt = """你是一个问题分类专家。
-分析用户问题的类型。
-返回JSON格式: {"type": "deep_research/strategy_qa/knowledge_qa", "reasoning": "理由"}"""
+        game_domain_context = self._get_game_domain_context(game)
+        game_domain_hint = self._get_game_domain_hint(game)
+
+        system_prompt = f"""你是{game_domain_context}的问题分类专家。
+    {game_domain_hint}
+    分析用户问题的类型。
+    返回JSON格式: {{"type": "deep_research/strategy_qa/knowledge_qa", "reasoning": "理由"}}"""
 
         response = await self._call_llm(question, system_prompt)
 
@@ -116,13 +158,18 @@ class DeepResearchFlow:
         logger.info(f"✅ 问题分类: {result['type']}")
         return result
 
-    async def plan_research(self, question: str, question_type: str) -> Dict[str, Any]:
+    async def plan_research(self, question: str, question_type: str, game: str) -> Dict[str, Any]:
         """步骤2: 研究任务规划"""
         logger.info(f"📋 [2/5] 规划研究任务...")
 
-        system_prompt = """你是一个任务规划专家。
-根据问题，将其拆解为3-5个具体的研究子任务。
-返回JSON格式: {"subtasks": [{"id": 1, "description": "...", "priority": "high"}]}"""
+        game_domain_context = self._get_game_domain_context(game)
+        game_domain_hint = self._get_game_domain_hint(game)
+
+        system_prompt = f"""你是{game_domain_context}的任务规划专家。
+    {game_domain_hint}
+    根据问题，将其拆解为3-5个具体的研究子任务。
+    子任务必须围绕游戏机制、作物收益、季节限制、成长周期、售价、种子成本等游戏内信息。
+    返回JSON格式: {{"subtasks": [{{"id": 1, "description": "...", "priority": "high"}}]}}"""
 
         response = await self._call_llm(
             f"问题类型:{question_type}\n原始问题:{question}",
@@ -149,15 +196,18 @@ class DeepResearchFlow:
         logger.info(f"✅ 规划了 {len(result['subtasks'])} 个子任务")
         return result
 
-    async def research_parallel(self, question: str, subtasks: List[Dict]) -> Dict[str, Any]:
+    async def research_parallel(self, question: str, subtasks: List[Dict], game: str) -> Dict[str, Any]:
         """步骤3: 并行研究"""
         logger.info(f"🔍 [3/5] 并行执行研究任务...")
 
-        search_queries = [task["description"] for task in subtasks]
+        search_queries = [
+            self._build_game_search_query(task.get("description", ""), game)
+            for task in subtasks
+        ]
 
         # 并行搜索
         search_tasks = [
-            tool_manager.search_and_scrape(query, max_pages=2)
+            tool_manager.search_and_scrape(query, max_pages=2, game_only=True, game=game)
             for query in search_queries
         ]
 
@@ -216,7 +266,7 @@ class DeepResearchFlow:
         logger.info(f"✅ 证据评估完成: {critique['evidence_quality']} 质量")
         return critique
 
-    async def write_answer(self, question: str, findings: Dict, critique: Dict) -> str:
+    async def write_answer(self, question: str, findings: Dict, critique: Dict, game: str) -> str:
         """步骤5: 生成答案"""
         logger.info(f"✍️  [5/5] 生成最终答案...")
 
@@ -226,10 +276,14 @@ class DeepResearchFlow:
             for e in findings.get("evidence", [])[:5]
         ])
 
-        system_prompt = """你是一个专业的答案生成专家。
-根据提供的证据，生成全面、准确的答案。
-确保逻辑清晰，引用来源。
-返回JSON格式: {"answer": "...", "confidence": 0.9}"""
+        game_domain_context = self._get_game_domain_context(game)
+        game_domain_hint = self._get_game_domain_hint(game)
+
+        system_prompt = f"""你是{game_domain_context}的答案生成专家。
+    {game_domain_hint}
+    根据提供的证据，生成全面、准确的答案。
+    确保逻辑清晰，引用来源。
+    返回JSON格式: {{"answer": "...", "confidence": 0.9}}"""
 
         prompt = f"""
 原始问题: {question}
@@ -262,33 +316,37 @@ class DeepResearchFlow:
         logger.info(f"✅ 答案生成完成")
         return answer
 
-    async def execute(self, question: str) -> Dict[str, Any]:
+    async def execute(self, question: str, game: str = "Stardew Valley") -> Dict[str, Any]:
         """执行完整的Deep Research流程"""
-        logger.info(f"📚 开始Deep Research: {question}")
+        game_name = self._normalize_game_name(game)
+        normalized_question = self._normalize_game_question(question, game_name)
+        logger.info(f"📚 开始Deep Research: {normalized_question}")
 
         try:
             # 步骤1: 路由
-            routing_result = await self.route_question(question)
+            routing_result = await self.route_question(normalized_question, game_name)
 
             # 步骤2: 规划
-            planning_result = await self.plan_research(question, routing_result.get("type"))
+            planning_result = await self.plan_research(normalized_question, routing_result.get("type"), game_name)
 
             # 步骤3: 并行研究
             research_result = await self.research_parallel(
-                question,
-                planning_result.get("subtasks", [])
+                normalized_question,
+                planning_result.get("subtasks", []),
+                game_name
             )
 
             # 步骤4: 评审
-            critique_result = await self.critic_review(question, research_result)
+            critique_result = await self.critic_review(normalized_question, research_result)
 
             # 步骤5: 生成答案
-            final_answer = await self.write_answer(question, research_result, critique_result)
+            final_answer = await self.write_answer(normalized_question, research_result, critique_result, game_name)
 
             # 汇总结果
             result = {
                 "session_id": self.session_id,
-                "question": question,
+                "game": game_name,
+                "question": normalized_question,
                 "question_type": routing_result.get("type"),
                 "subtasks_count": len(planning_result.get("subtasks", [])),
                 "evidence_count": research_result.get("count", 0),

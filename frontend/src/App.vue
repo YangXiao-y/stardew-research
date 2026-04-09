@@ -5,7 +5,7 @@
     <!-- 顶部导航 -->
     <header class="navbar">
       <div class="navbar-brand">
-        <h1>🌾 Stardew Valley AI 研究助手</h1>
+        <h1>🌾AI 游戏攻略助手</h1>
         <p class="subtitle">Multi-Agent AI Research System</p>
       </div>
       <div class="navbar-links">
@@ -37,6 +37,15 @@
               rows="4"
               class="textarea"
             ></textarea>
+          </div>
+
+          <div class="form-group">
+            <label>目标游戏</label>
+            <input
+              v-model="researchForm.game"
+              placeholder="例如：Stardew Valley / 原神 / 塞尔达传说"
+              class="input"
+            />
           </div>
 
           <div class="form-row">
@@ -229,6 +238,7 @@ const error = ref(null)
 // 研究表单
 const researchForm = ref({
   question: '',
+  game: 'Stardew Valley',
   model: 'qwen',
   debug: false,
 })
@@ -258,7 +268,8 @@ async function startResearch_() {
     const result = await startResearch(
       researchForm.value.question,
       researchForm.value.model,
-      researchForm.value.debug
+      researchForm.value.debug,
+      researchForm.value.game
     )
 
     currentResult.value = result
@@ -279,9 +290,15 @@ async function continueTurn(sessionId) {
   error.value = null
 
   try {
-    const result = await researchTurn(sessionId, nextQuestion)
+    const result = await researchTurn(
+      sessionId,
+      nextQuestion,
+      true,
+      currentResult.value?.game || researchForm.value.game
+    )
     currentResult.value = {
       ...currentResult.value,
+      game: result.game || currentResult.value?.game || researchForm.value.game,
       answer: result.answer,
     }
   } catch (err) {
@@ -458,6 +475,7 @@ onMounted(async () => {
 }
 
 .textarea,
+.input,
 .select {
   width: 100%;
   padding: 0.75rem;

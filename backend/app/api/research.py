@@ -61,6 +61,7 @@ async def start_research(
         # 执行研究
         result = await research_service.execute_research(
             question=request.question,
+            game=request.game,
             model=request.model,
             debug=request.debug
         )
@@ -68,6 +69,7 @@ async def start_research(
         # 保存到内存
         research_sessions[session_id] = {
             "created_at": datetime.now(),
+            "game": request.game,
             "question": request.question,
             "result": result,
             "turns": [
@@ -84,6 +86,7 @@ async def start_research(
 
         return ResearchResponse(
             session_id=session_id,
+            game=request.game,
             question=request.question,
             question_type=result.get("question_type", "general_qa"),
             subtasks_count=result.get("subtasks_count", 3),
@@ -128,10 +131,13 @@ async def research_turn(request: ResearchTurnRequest):
         if session_id not in research_sessions:
             research_sessions[session_id] = {
                 "created_at": datetime.now(),
+                "game": request.game or "Stardew Valley",
                 "turns": []
             }
 
         session = research_sessions[session_id]
+        session_game = request.game or session.get("game", "Stardew Valley")
+        session["game"] = session_game
         turn_num = len(session["turns"]) + 1
 
         logger.info(f"🔄 处理轮次 {turn_num}: {session_id}")
@@ -147,6 +153,7 @@ async def research_turn(request: ResearchTurnRequest):
         # 执行研究
         result = await research_service.execute_research(
             question=request.question,
+            game=session_game,
             model=request.model,
             debug=request.debug
         )
@@ -165,6 +172,7 @@ async def research_turn(request: ResearchTurnRequest):
         return ResearchTurnResponse(
             session_id=session_id,
             turn=turn_num,
+            game=session_game,
             question=request.question,
             answer=result.get("final_answer", ""),
             evidence_count=len(result.get("evidence_pool", [])),

@@ -7,7 +7,7 @@
 const API_BASE_URL = 'http://localhost:8000/api'
 
 // 创建研究
-export async function startResearch(question, model = 'qwen', debug = false) {
+export async function startResearch(question, model = 'qwen', debug = false, game = 'Stardew Valley') {
   const response = await fetch(`${API_BASE_URL}/research`, {
     method: 'POST',
     headers: {
@@ -15,6 +15,7 @@ export async function startResearch(question, model = 'qwen', debug = false) {
     },
     body: JSON.stringify({
       question,
+      game,
       model,
       debug,
     }),
@@ -28,7 +29,7 @@ export async function startResearch(question, model = 'qwen', debug = false) {
 }
 
 // 单轮对话
-export async function researchTurn(sessionId, question, useMemory = true) {
+export async function researchTurn(sessionId, question, useMemory = true, game = 'Stardew Valley') {
   const response = await fetch(`${API_BASE_URL}/research/turn`, {
     method: 'POST',
     headers: {
@@ -37,6 +38,7 @@ export async function researchTurn(sessionId, question, useMemory = true) {
     body: JSON.stringify({
       session_id: sessionId,
       question,
+      game,
       use_memory: useMemory,
       model: 'qwen',
       debug: false,

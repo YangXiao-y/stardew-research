@@ -111,6 +111,7 @@ class ResearchService:
     async def execute_research(
         self,
         question: str,
+        game: str = "Stardew Valley",
         model: str = "qwen",
         debug: bool = False,
         enable_multi_turn: bool = True
@@ -121,6 +122,7 @@ class ResearchService:
 
         Args:
             question: 用户问题
+            game: 目标游戏
             model: LLM 模型
             debug: 是否调试
             enable_multi_turn: 是否启用多轮对话
@@ -143,11 +145,12 @@ class ResearchService:
             # 执行Deep Research流程
             flow = DeepResearchFlow(model=model)
             flow.session_id = session_id
-            research_result = await flow.execute(question)
+            research_result = await flow.execute(question, game=game)
 
             # 保存会话信息
             self._sessions[session_id] = {
                 "session_id": session_id,
+                "game": game,
                 "question": question,
                 "created_at": datetime.now().isoformat(),
                 "turns": [

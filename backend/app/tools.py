@@ -67,6 +67,29 @@ class SearchTool:
             logger.error(f"❌ 搜索异常: {str(e)}")
             return []
 
+    def is_game_related(self, title: str, snippet: str, url: str, game: str = "Stardew Valley") -> bool:
+        text = f"{title} {snippet} {url}".lower()
+        game_name = (game or "").strip().lower()
+        keywords = [game_name]
+
+        alias_map = {
+            "stardew valley": [
+                "stardew",
+                "stardew valley",
+                "星露谷",
+                "星露谷物语",
+                "stardewvalley",
+                "stardewwiki",
+                "wiki.gg/stardew",
+            ]
+        }
+
+        if game_name in alias_map:
+            keywords.extend(alias_map[game_name])
+
+        keywords = [k for k in keywords if k]
+        return any(k in text for k in keywords)
+
 class WebScraperTool:
     """网页爬取工具 (Browserless)"""
 
@@ -128,9 +151,28 @@ class ToolManager:
         """爬取内容"""
         return await self.scraper_tool.scrape_content(url)
 
-    async def search_and_scrape(self, query: str, max_pages: int = 3) -> List[Dict[str, Any]]:
+    async def search_and_scrape(
+        self,
+        query: str,
+        max_pages: int = 3,
+        game_only: bool = False,
+        game: str = "Stardew Valley"
+    ) -> List[Dict[str, Any]]:
         """搜索并爬取前N个结果"""
-        search_results = await self.search(query, max_pages)
+        search_results = await self.search(query, max_pages * 3 if game_only else max_pages)
+
+        if game_only:
+            search_results = [
+                result for result in search_results
+                if self.search_tool.is_game_related(
+                    result.get("title", ""),
+                    result.get("snippet", ""),
+                    result.get("url", ""),
+                    game
+                )
+            ]
+
+        search_results = search_results[:max_pages]
 
         enriched_results = []
         for result in search_results:
